@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RunOnWeb AI Playground</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="stylesheet" href="./src/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-badge">⚡ RunOnWeb</div>
+        <h1>AI Local Playground</h1>
+        <p class="subtitle">Modelos de IA ejecutados 100% en tu navegador con WebGPU / WASM. Sin backend ni APIs de pago.</p>
+      </div>
+      <div class="header-right">
+        <div id="device-badge" class="status-badge checking">
+          <span class="status-dot"></span>
+          <span class="status-text">Detectando WebGPU...</span>
+        </div>
+        <button id="btn-cache-info" class="btn-secondary btn-sm" title="Ver y gestionar caché de modelos">
+          💾 Caché: <span id="cache-size">Calculando...</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Global Progress Bar for Model Downloads -->
+    <div id="global-progress-bar-container" class="progress-container hidden">
+      <div class="progress-header">
+        <div class="progress-info">
+          <span class="spinner-small"></span>
+          <span id="progress-status-text">Descargando pesos del modelo...</span>
+        </div>
+        <span id="progress-percent" class="progress-percent">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs" id="main-tabs">
+      <button class="tab-btn active" data-tab="tab-emoji">
+        <span class="tab-icon">✨</span> Texto a Emojis <span class="badge-tag">~4MB</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-remove-bg">
+        <span class="tab-icon">✂️</span> Quitar Fondo
+      </button>
+      <button class="tab-btn" data-tab="tab-translate">
+        <span class="tab-icon">🌐</span> Traductor
+      </button>
+      <button class="tab-btn" data-tab="tab-detect">
+        <span class="tab-icon">🔍</span> Detección de Objetos
+      </button>
+      <button class="tab-btn" data-tab="tab-embed">
+        <span class="tab-icon">📐</span> Similitud Semántica
+      </button>
+      <button class="tab-btn" data-tab="tab-stt">
+        <span class="tab-icon">🎙️</span> Voz a Texto
+      </button>
+      <button class="tab-btn" data-tab="tab-caption">
+        <span class="tab-icon">👁️</span> Describir Imagen
+      </button>
+    </nav>
+
+    <!-- Tab Contents -->
+    <main class="playground-main">
+      <!-- TAB 1: EMOJI -->
+      <section id="tab-emoji" class="tab-pane active">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Texto a Emojis (Emojifier)</h2>
+              <p class="card-desc">Modelo T5 minúsculo (~3.9 MB). Ideal para probar la descarga y ejecución rápida en el navegador.</p>
+            </div>
+            <span class="chip">Modelo: midudev/text2emoji-tiny</span>
+          </div>
+
+          <div class="quick-examples">
+            <span>Ejemplos rápidos:</span>
+            <button class="chip-btn" data-fill="emoji-input" data-text="Me encanta comer pizza con mis amigos">🍕 Pizza amigos</button>
+            <button class="chip-btn" data-fill="emoji-input" data-text="Viajando en avión a una playa tropical soleada">🏖️ Vacaciones</button>
+            <button class="chip-btn" data-fill="emoji-input" data-text="Un gato jugando con una pelota bajo la lluvia">🐱 Gato lluvia</button>
+          </div>
+
+          <div class="form-group">
+            <label for="emoji-input">Escribe una frase en cualquier idioma:</label>
+            <textarea id="emoji-input" rows="3" placeholder="Escribe algo aquí... (ej. Paseando a mi perro en el parque)">Paseando a mi perro en el parque soleado</textarea>
+          </div>
+
+          <div class="action-row">
+            <button id="btn-run-emoji" class="btn-primary">
+              <span class="btn-icon">⚡</span> Convertir a Emojis
+            </button>
+            <span id="time-emoji" class="metric-text"></span>
+          </div>
+
+          <div class="result-box" id="emoji-result-container">
+            <span class="result-label">Resultado:</span>
+            <div id="emoji-output" class="emoji-display">—</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: REMOVE BACKGROUND -->
+      <section id="tab-remove-bg" class="tab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Quitar Fondo de Imágenes (BEN2)</h2>
+              <p class="card-desc">Segmentación de primer plano con alta precisión para cabello, objetos y bordes complejos.</p>
+            </div>
+            <span class="chip">Modelo: onnx-community/BEN2-ONNX</span>
+          </div>
+
+          <div class="dropzone-and-samples">
+            <div class="dropzone" id="bg-dropzone">
+              <input type="file" id="bg-file-input" accept="image/*" class="file-input-hidden">
+              <div class="dropzone-content">
+                <span class="dropzone-icon">📁</span>
+                <p><strong>Arrastra una foto aquí</strong> o haz clic para subir</p>
+                <small>Formatos: JPG, PNG, WebP</small>
+              </div>
+            </div>
+            <div class="sample-picker">
+              <span>O prueba con una imagen de ejemplo:</span>
+              <div class="sample-images-grid">
+                <button class="btn-sample" id="btn-sample-person">👤 Retrato</button>
+                <button class="btn-sample" id="btn-sample-cat">🐱 Mascota</button>
+                <button class="btn-sample" id="btn-sample-car">🚗 Coche</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="btn-run-bg" class="btn-primary" disabled>
+              <span class="btn-icon">✂️</span> Quitar Fondo
+            </button>
+            <button id="btn-download-bg" class="btn-secondary" style="display: none;">
+              ⬇️ Descargar PNG Transparente
+            </button>
+            <span id="time-bg" class="metric-text"></span>
+          </div>
+
+          <!-- Comparison Display -->
+          <div class="comparison-grid" id="bg-preview-grid" style="display: none;">
+            <div class="preview-card">
+              <span class="preview-title">Original</span>
+              <div class="img-wrapper">
+                <img id="bg-original-img" alt="Original">
+              </div>
+            </div>
+            <div class="preview-card">
+              <span class="preview-title">Sin Fondo (Transparente)</span>
+              <div class="img-wrapper checker-bg">
+                <img id="bg-result-img" alt="Resultado">
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: TRANSLATE -->
+      <section id="tab-translate" class="tab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Traductor Local (Firefox Bergamot)</h2>
+              <p class="card-desc">El mismo motor de traducción ultrarrápido y privado que usa Mozilla Firefox en local.</p>
+            </div>
+            <span class="chip">WASM Bergamot</span>
+          </div>
+
+          <div class="lang-controls">
+            <div class="lang-select-group">
+              <label for="trans-from">Origen:</label>
+              <select id="trans-from">
+                <option value="en">Inglés (en)</option>
+                <option value="es" selected>Español (es)</option>
+                <option value="fr">Francés (fr)</option>
+                <option value="de">Alemán (de)</option>
+                <option value="it">Italiano (it)</option>
+                <option value="pt">Portugués (pt)</option>
+              </select>
+            </div>
+            <button id="btn-swap-lang" class="btn-icon-only" title="Intercambiar idiomas">⇄</button>
+            <div class="lang-select-group">
+              <label for="trans-to">Destino:</label>
+              <select id="trans-to">
+                <option value="en" selected>Inglés (en)</option>
+                <option value="es">Español (es)</option>
+                <option value="fr">Francés (fr)</option>
+                <option value="de">Alemán (de)</option>
+                <option value="it">Italiano (it)</option>
+                <option value="pt">Portugués (pt)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="translate-grid">
+            <div class="form-group">
+              <label for="trans-input">Texto a traducir:</label>
+              <textarea id="trans-input" rows="5" placeholder="Escribe el texto aquí...">La inteligencia artificial que corre directamente en el navegador ofrece privacidad y no tiene costes de servidor.</textarea>
+            </div>
+            <div class="form-group">
+              <label for="trans-output">Traducción:</label>
+              <textarea id="trans-output" rows="5" readonly placeholder="La traducción aparecerá aquí..."></textarea>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="btn-run-trans" class="btn-primary">
+              <span class="btn-icon">🌐</span> Traducir
+            </button>
+            <button id="btn-copy-trans" class="btn-secondary">📋 Copiar</button>
+            <span id="time-trans" class="metric-text"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: OBJECT DETECTION -->
+      <section id="tab-detect" class="tab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Detección de Objetos (RF-DETR Nano)</h2>
+              <p class="card-desc">Detecta personas, vehículos, animales y objetos comunes dibujando sus recuadros en tiempo real.</p>
+            </div>
+            <span class="chip">RF-DETR Nano ONNX</span>
+          </div>
+
+          <div class="dropzone-and-samples">
+            <div class="dropzone" id="detect-dropzone">
+              <input type="file" id="detect-file-input" accept="image/*" class="file-input-hidden">
+              <div class="dropzone-content">
+                <span class="dropzone-icon">📷</span>
+                <p><strong>Carga una imagen</strong> para detectar objetos</p>
+              </div>
+            </div>
+            <div class="sample-picker">
+              <span>Ejemplos:</span>
+              <div class="sample-images-grid">
+                <button class="btn-sample" id="btn-detect-sample-street">🚦 Calle / Tráfico</button>
+                <button class="btn-sample" id="btn-detect-sample-desk">💻 Escritorio</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <div class="threshold-slider-group">
+              <label for="detect-threshold">Umbral de confianza: <strong id="thresh-val">0.45</strong></label>
+              <input type="range" id="detect-threshold" min="0.1" max="0.9" step="0.05" value="0.45">
+            </div>
+            <button id="btn-run-detect" class="btn-primary" disabled>
+              <span class="btn-icon">🔍</span> Detectar Objetos
+            </button>
+            <span id="time-detect" class="metric-text"></span>
+          </div>
+
+          <div class="detection-view-container" id="detect-canvas-wrapper" style="display: none;">
+            <div class="canvas-container">
+              <canvas id="detect-canvas"></canvas>
+            </div>
+            <div class="detections-list-card">
+              <h3>Objetos Detectados (<span id="detect-count">0</span>):</h3>
+              <ul id="detections-ul" class="detections-tags"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: SEMANTIC SIMILARITY / EMBEDDINGS -->
+      <section id="tab-embed" class="tab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Similitud Semántica y Embeddings</h2>
+              <p class="card-desc">Calcula vectores multidimensionales con MiniLM y mide qué tan parecidas son dos oraciones en significado.</p>
+            </div>
+            <span class="chip">Xenova/all-MiniLM-L6-v2</span>
+          </div>
+
+          <div class="quick-examples">
+            <span>Comparaciones sugeridas:</span>
+            <button class="chip-btn" id="btn-sim-dog">🐶 Perro y Cachorro (Alta similitud)</button>
+            <button class="chip-btn" id="btn-sim-diff">🍎 Fruta y Computadora (Baja similitud)</button>
+            <button class="chip-btn" id="btn-sim-lang">🇪🇸 Inglés y Español ("Hello" / "Hola")</button>
+          </div>
+
+          <div class="embed-inputs-grid">
+            <div class="form-group">
+              <label for="embed-text1">Texto 1:</label>
+              <textarea id="embed-text1" rows="3">El perro corre alegremente por el parque persiguiendo la pelota.</textarea>
+            </div>
+            <div class="form-group">
+              <label for="embed-text2">Texto 2:</label>
+              <textarea id="embed-text2" rows="3">Un cachorro juguetón salta en el césped detrás de un juguete.</textarea>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="btn-run-embed" class="btn-primary">
+              <span class="btn-icon">📐</span> Comparar Similitud
+            </button>
+            <span id="time-embed" class="metric-text"></span>
+          </div>
+
+          <div class="similarity-meter-card" id="embed-result-card" style="display: none;">
+            <div class="sim-header">
+              <span>Similitud Coseno:</span>
+              <strong id="sim-percentage" class="sim-score">0%</strong>
+            </div>
+            <div class="sim-bar-track">
+              <div id="sim-bar-fill" class="sim-bar-fill" style="width: 0%;"></div>
+            </div>
+            <p id="sim-interpretation" class="sim-caption"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: SPEECH TO TEXT -->
+      <section id="tab-stt" class="tab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Voz a Texto (Whisper)</h2>
+              <p class="card-desc">Transcribe voz en directo desde el micrófono o carga un archivo de audio (.wav, .mp3, .ogg).</p>
+            </div>
+            <span class="chip">Whisper Tiny</span>
+          </div>
+
+          <div class="audio-input-methods">
+            <div class="mic-recorder-box">
+              <h3>Grabar desde Micrófono</h3>
+              <p>Habla en tu micrófono para transcribir localmente:</p>
+              <button id="btn-mic-toggle" class="btn-record">
+                <span class="record-icon">🎙️</span> <span id="record-text">Iniciar Grabación</span>
+              </button>
+              <span id="record-timer" class="record-timer">00:00</span>
+            </div>
+
+            <div class="divider-text">O</div>
+
+            <div class="dropzone audio-dropzone" id="audio-dropzone">
+              <input type="file" id="audio-file-input" accept="audio/*" class="file-input-hidden">
+              <div class="dropzone-content">
+                <span class="dropzone-icon">🎵</span>
+                <p><strong>Carga un archivo de audio</strong></p>
+                <small>Formatos: MP3, WAV, OGG, WebM</small>
+              </div>
+            </div>
+          </div>
+
+          <div id="audio-player-container" style="display: none; margin-top: 1rem;">
+            <audio id="audio-playback" controls style="width: 100%;"></audio>
+          </div>
+
+          <div class="action-row" style="margin-top: 1.5rem;">
+            <button id="btn-run-stt" class="btn-primary" disabled>
+              <span class="btn-icon">📝</span> Transcribir Audio
+            </button>
+            <span id="time-stt" class="metric-text"></span>
+          </div>
+
+          <div class="result-box">
+            <span class="result-label">Transcripción:</span>
+            <div id="stt-output" class="transcription-text">Aún no hay transcripción. Graba o sube un archivo y presiona transcribir.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: IMAGE CAPTIONING -->
+      <section id="tab-caption" class="tab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Descripción de Imágenes (Liquid Vision LFM2.5)</h2>
+              <p class="card-desc">Genera descripciones automáticas para accesibilidad (alt-text) o análisis de imágenes.</p>
+            </div>
+            <span class="chip">LFM2.5-VL-450M-ONNX</span>
+          </div>
+
+          <div class="dropzone-and-samples">
+            <div class="dropzone" id="caption-dropzone">
+              <input type="file" id="caption-file-input" accept="image/*" class="file-input-hidden">
+              <div class="dropzone-content">
+                <span class="dropzone-icon">🖼️</span>
+                <p><strong>Sube una imagen</strong> para describirla</p>
+              </div>
+            </div>
+            <div class="sample-picker">
+              <span>Muestras:</span>
+              <div class="sample-images-grid">
+                <button class="btn-sample" id="btn-caption-sample-nature">🌲 Paisaje</button>
+                <button class="btn-sample" id="btn-caption-sample-coffee">☕ Café y libro</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="caption-controls">
+            <div class="form-group-inline">
+              <label for="caption-lang">Idioma:</label>
+              <select id="caption-lang">
+                <option value="es" selected>Español</option>
+                <option value="en">Inglés</option>
+                <option value="fr">Francés</option>
+              </select>
+            </div>
+            <div class="form-group-inline">
+              <label for="caption-detail">Nivel de detalle:</label>
+              <select id="caption-detail">
+                <option value="short" selected>Corto (Alt-text conciso)</option>
+                <option value="detailed">Detallado (2-3 oraciones)</option>
+                <option value="more">Muy detallado</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="caption-preview-wrapper" style="display: none; margin: 1rem 0;">
+            <img id="caption-preview-img" style="max-height: 250px; border-radius: 8px; border: 1px solid var(--border);" alt="Preview">
+          </div>
+
+          <div class="action-row">
+            <button id="btn-run-caption" class="btn-primary" disabled>
+              <span class="btn-icon">👁️</span> Generar Descripción
+            </button>
+            <span id="time-caption" class="metric-text"></span>
+          </div>
+
+          <div class="result-box">
+            <span class="result-label">Descripción generada:</span>
+            <p id="caption-output" class="caption-text">—</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Cache Management Modal -->
+    <div id="cache-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Gestión de Caché Local</h3>
+          <button id="btn-close-modal" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Los modelos descargados quedan en la caché de tu navegador para no tener que volver a descargarlos:</p>
+          <div id="modal-cache-list" class="cached-models-list">
+            <p class="text-muted">Consultando modelos en caché...</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-clear-cache" class="btn-danger">🗑️ Borrar toda la caché</button>
+          <button id="btn-modal-done" class="btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Construido con <a href="https://runonweb.ai" target="_blank" rel="noopener">RunOnWeb</a> de <a href="https://github.com/midudev" target="_blank" rel="noopener">@midudev</a> &middot; Ejecutado en local con Vite</p>
+    </footer>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
